@@ -144,6 +144,7 @@ def search_publications(
     limit: int = 10,
     year_start: int | None = None,
     year_end: int | None = None,
+    sort_by: str = "relevance",
 ) -> Iterator[Publication]:
     """Search Google Scholar for publications.
 
@@ -152,6 +153,7 @@ def search_publications(
         limit: Maximum number of results to return
         year_start: Filter results from this year onwards
         year_end: Filter results up to this year
+        sort_by: Sort order - 'relevance' or 'date' (newest first)
 
     Yields:
         Publication objects matching the query
@@ -160,9 +162,11 @@ def search_publications(
         >>> for pub in search_publications('"machine learning" AND healthcare', limit=5):
         ...     print(pub.title)
     """
-    logger.info("Searching publications: %s (limit=%d)", query, limit)
+    logger.info("Searching publications: %s (limit=%d, sort=%s)", query, limit, sort_by)
 
-    search_query = scholarly.search_pubs(query, year_low=year_start, year_high=year_end)
+    search_query = scholarly.search_pubs(
+        query, year_low=year_start, year_high=year_end, sort_by=sort_by
+    )
 
     count = 0
     for result in search_query:

@@ -102,6 +102,13 @@ def main(ctx: click.Context, verbose: int, quiet: bool) -> None:
 @click.option("-l", "--limit", default=10, show_default=True, help="Maximum results to return")
 @click.option("--year-start", type=int, help="Filter results from this year onwards")
 @click.option("--year-end", type=int, help="Filter results up to this year")
+@click.option(
+    "--sort",
+    type=click.Choice(["relevance", "date"], case_sensitive=False),
+    default="relevance",
+    show_default=True,
+    help="Sort results by relevance or date (newest first)",
+)
 @click.option("-j", "--json-output", is_flag=True, help="Output results as JSON")
 @click.option("-s", "--stdin", is_flag=True, help="Read query from stdin")
 @click.pass_context
@@ -114,6 +121,7 @@ def search_cmd(
     limit: int,
     year_start: int | None,
     year_end: int | None,
+    sort: str,
     json_output: bool,
     stdin: bool,
 ) -> None:
@@ -139,6 +147,10 @@ def search_cmd(
     \b
         # Filter by year range
         google-scholar-tool search "deep learning" --year-start 2020 --year-end 2024
+
+    \b
+        # Sort by date (newest first)
+        google-scholar-tool search "transformers" --sort date --limit 5
 
     \b
         # Output as JSON
@@ -190,6 +202,7 @@ def search_cmd(
             limit=limit,
             year_start=year_start,
             year_end=year_end,
+            sort_by=sort,
         )
     )
 
