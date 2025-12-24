@@ -1,10 +1,11 @@
 [project]
 name = "google-scholar-tool"
 version = "0.1.0"
-description = "A Python CLI tool"
+description = "A CLI tool for querying Google Scholar for academic research"
 requires-python = ">=3.14"
 dependencies = [
     "click>=8.1.7",
+    "scholarly>=1.7.11",
 ]
 authors = [
     {name = "Dennis Vriend", email = "dvriend@ilionx.com"}
