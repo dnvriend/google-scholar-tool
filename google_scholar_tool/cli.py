@@ -11,12 +11,17 @@ and has been reviewed and tested by a human.
 import json
 import os
 import sys
+import warnings
 
-import click
+# Suppress SyntaxWarnings from scholarly library before importing it
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="scholarly")
 
-from google_scholar_tool.completion import completion_command
-from google_scholar_tool.logging_config import get_logger, setup_logging
-from google_scholar_tool.scholar import (
+import click  # noqa: E402
+
+from google_scholar_tool.books import Book, search_books  # noqa: E402
+from google_scholar_tool.completion import completion_command  # noqa: E402
+from google_scholar_tool.logging_config import get_logger, setup_logging  # noqa: E402
+from google_scholar_tool.scholar import (  # noqa: E402
     Author,
     Publication,
     build_query,
@@ -323,6 +328,122 @@ def author_cmd(
                     click.echo(f"   Interests: {', '.join(author.interests)}")
                 if author.scholar_id:
                     click.echo(f"   Scholar ID: {author.scholar_id}")
+
+
+@main.command("books")
+@click.argument("query", required=False)
+@click.option("-l", "--limit", default=10, show_default=True, help="Maximum results to return")
+@click.option("-j", "--json-output", is_flag=True, help="Output results as JSON")
+@click.option("-s", "--stdin", is_flag=True, help="Read query from stdin")
+@click.option(
+    "-c",
+    "--cite",
+    type=click.Choice(["apa", "mla", "chicago", "harvard"], case_sensitive=False),
+    help="Output citations in specified style",
+)
+@click.pass_context
+def books_cmd(
+    ctx: click.Context,
+    query: str | None,
+    limit: int,
+    json_output: bool,
+    stdin: bool,
+    cite: str | None,
+) -> None:
+    """Search Google Books for volumes.
+
+    Requires GOOGLE_BOOKS_API_KEY environment variable to be set.
+
+    Examples:
+
+    \b
+        # Basic search
+        google-scholar-tool books "machine learning"
+
+    \b
+        # Output as JSON
+        google-scholar-tool books "python programming" --json-output
+
+    \b
+        # Get APA citations for papers
+        google-scholar-tool books "python programming" --cite apa
+
+    \b
+        # Get MLA citations
+        google-scholar-tool books "machine learning" --cite mla --limit 5
+
+    \b
+    Note: Content search within books is not available via the API.
+    Use --preview-link in output to search manually in Google Books.
+
+    \b
+    Output Format (JSON):
+        [{"title": "...", "authors": [...], "publisher": "...",
+          "published_date": "2024", "description": "...", "page_count": 300}]
+    """
+    quiet = ctx.obj.get("quiet", False)
+
+    # Handle stdin input
+    if stdin:
+        if not sys.stdin.isatty():
+            query = sys.stdin.read().strip()
+        else:
+            click.echo("Error: --stdin specified but no input provided", err=True)
+            click.echo("Fix: echo 'query' | google-scholar-tool books --stdin", err=True)
+            ctx.exit(1)
+
+    # Validate query
+    if not query:
+        click.echo("Error: Missing query argument", err=True)
+        click.echo(
+            "Fix: Provide a search query, e.g.: google-scholar-tool books 'python'",
+            err=True,
+        )
+        ctx.exit(1)
+
+    # Execute search
+    logger.info("Executing books search: %s", query)
+    try:
+        results: list[Book] = list(search_books(query, limit=limit))
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
+
+    if not results:
+        if not quiet:
+            click.echo("No results found")
+        return
+
+    # Output results
+    if json_output:
+        output = [book.to_dict() for book in results]
+        click.echo(json.dumps(output, indent=2, ensure_ascii=False))
+    elif cite:
+        # Citation output mode
+        for book in results:
+            click.echo(book.cite(cite))
+    else:
+        for i, book in enumerate(results, 1):
+            if not quiet:
+                # Title with clickable link if info_link available
+                if book.info_link:
+                    title_display = hyperlink(book.info_link, book.title)
+                else:
+                    title_display = book.title
+                click.echo(f"\n{i}. {title_display}")
+                click.echo(f"   Authors: {', '.join(book.authors) if book.authors else 'Unknown'}")
+                if book.publisher:
+                    click.echo(f"   Publisher: {book.publisher}")
+                if book.published_date:
+                    click.echo(f"   Published: {book.published_date}")
+                if book.page_count:
+                    click.echo(f"   Pages: {book.page_count}")
+                if book.categories:
+                    click.echo(f"   Categories: {', '.join(book.categories)}")
+                if book.isbn:
+                    click.echo(f"   ISBN: {book.isbn}")
+                if book.preview_link:
+                    click.echo(f"   Preview: {hyperlink(book.preview_link, '[Search in book]')}")
 
 
 # Add completion subcommand
